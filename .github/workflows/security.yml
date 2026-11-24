@@ -25,7 +25,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}:/repo" \
             zricethezav/gitleaks:latest \
-            detect --source /repo --exit-code 1
+            detect --source /repo --config /repo/.gitleaks.toml --exit-code 1 --redact
 
       - name: SAST scan (Semgrep)
         continue-on-error: true
