@@ -1,0 +1,49 @@
+
+name: Security Pipeline
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret scan (Gitleaks)
+        id: gitleaks
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            zricethezav/gitleaks:latest \
+            detect --source /repo --exit-code 1
+
+      - name: SAST scan (Semgrep)
+        continue-on-error: true
+        run: |
+          pip install semgrep
+          semgrep scan --config p/python --error .
+
+      - name: Dependency scan (Trivy)
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo" \
+            aquasec/trivy:latest \
+            fs --scanners vuln --exit-code 0 /repo
+
+      - name: Enforce secret scan gate
+        if: always()
+        run: |
+          if [ "${{ steps.gitleaks.outcome }}" != "success" ]; then
+            echo "Gitleaks failed: blocking the build."
+            exit 1
+          fi
